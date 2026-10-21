@@ -340,3 +340,20 @@ Work Log:
 Stage Summary:
 - Штат разделён по филиалам: Серкебаева, 81 — 36 врачей; Пограничная, 1/1 — 22 врача (список от пользователя применён полностью, 22/22). Оба филиала 24/7, описания и фильтры на сайте обновлены автоматически (BranchPage считает врачей динамически).
 - Скрипты: imp_branch18_match.py (сверка), imp_branch18_apply.py (применение, идемпотентен по матчингу имени+отчества).
+
+---
+Task ID: 19
+Agent: main (Z.ai)
+Task: Сид для БД — перенос данных на другую машину (prisma db seed)
+
+Work Log:
+- Создан scripts/export-seed.mjs — экспорт контентных таблиц (Branch, Specialty, Doctor, Review, FaqItem, SiteText, SiteImage, Setting) в prisma/seed-data.json (504 КБ); даты createdAt/updatedAt не экспортируются (генерируются заново), Booking (заявки) не экспортируется.
+- Создан prisma/seed.mjs — идемпотентный сид: upsert по естественным ключам (id/slug/key), сохраняет id отзывов/FAQ (ссылки на врачей не ломаются), печатает итоговые счётчики. В шапке файла — инструкция переноса на другую машину.
+- package.json: добавлены скрипты db:seed (prisma db seed), db:export-seed (node scripts/export-seed.mjs) и блок "prisma": {"seed": "node prisma/seed.mjs"}.
+- Тест переноса: чистая БД (tmp-seedtest/test.db) → prisma db push → node prisma/seed.mjs — все 8 таблиц восстановлены; построчная сверка с оригиналом (scripts/seed_verify.py): 8/8 таблиц идентичны (без дат); Подкорытов → ["pogranichnaya"], FAQ 6 без «ДМС», битых ссылок отзывов 0.
+- Идемпотентность: двойной прогон сида — счётчики стабильны (58/48/5/14/6/233/2/7). Прогон на основной БД — без ошибок; сайт отвечает 200, «Что мы обещаем» на месте.
+
+Stage Summary:
+- Перенос на другую машину: скопировать проект (включая prisma/seed-data.json и public/ с фото) → bun install → в .env DATABASE_URL=file:<путь>/db/custom.db → npx prisma db push (если БД пуста) → npx prisma generate → npx prisma db seed. Данные (58 врачей, 48 направлений, 5 филиалов, цены, тексты RU/KZ, настройки) восстанавливаются полностью.
+- После правок контента в админке обновлять сид: npm run db:export-seed.
+- Файлы: prisma/seed-data.json (данные), prisma/seed.mjs (сид), scripts/export-seed.mjs (экспорт), scripts/seed_verify.py (сверка оригинал↔сид).
