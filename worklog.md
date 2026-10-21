@@ -357,3 +357,20 @@ Stage Summary:
 - Перенос на другую машину: скопировать проект (включая prisma/seed-data.json и public/ с фото) → bun install → в .env DATABASE_URL=file:<путь>/db/custom.db → npx prisma db push (если БД пуста) → npx prisma generate → npx prisma db seed. Данные (58 врачей, 48 направлений, 5 филиалов, цены, тексты RU/KZ, настройки) восстанавливаются полностью.
 - После правок контента в админке обновлять сид: npm run db:export-seed.
 - Файлы: prisma/seed-data.json (данные), prisma/seed.mjs (сид), scripts/export-seed.mjs (экспорт), scripts/seed_verify.py (сверка оригинал↔сид).
+
+---
+Task ID: 20
+Agent: main (Z.ai)
+Task: Убрать старые сиды, смешавшиеся с новыми данными (сид для переноса — Task 19)
+
+Work Log:
+- Найдены старые демо-остатки первоначального сида (Task 1): 3 неопубликованных филиала («Самал», «Центральный», «Аксай» со старыми телефонами +7 (727) 350-40-4x), скрытая демо-процедура check-up (5 пакетов), легаси-файлы src/lib/alash/data/ (7 файлов, 1505 строк — ноль импортов, сайт читает БД через content.ts) и старый scripts/seed.ts (заливал демо-данные, импортировал удалённые файлы).
+- scripts/cleanup_old_seed.py: удаление из БД с предохранителями (проверка ссылок Doctor.branches / Review.branchId / Booking перед DELETE): Branch -3, Specialty(check-up) -1. Итог: Branch 2, Specialty 47, Doctor 58, SiteText 233, Review 14, FaqItem 6.
+- Удалены src/lib/alash/data/ (целиком) и scripts/seed.ts (единственный потребитель, ссылок в package.json нет).
+- Побочные следы старого сида в живых текстах: fizioterapiya descRu/descKz упоминали «Кабинет в филиале «Аксай»/«Ақсай» филиалында» → заменено на клинику на Серкебаева, 81 (KZ: «Серкебаева, 81 мекенжайындағы клиникада»); отзыв r11 «Кардио check-up за один день» → «Кардиодиагностика за один день» (остальной текст без изменений).
+- Переэкспорт prisma/seed-data.json: branches 2 (serkebaeva, pogranichnaya), specialties 47; grep по сиду — 0 вхождений: Аксай/Ақсай/Самал/Центральный/Абылай/Жубанова/350-40/check-up.
+- Верификация: восстановление на чистой БД (db push + seed) — 8/8 таблиц построчно идентичны (seed_verify.py); tsc --noEmit чисто; браузер: /#/specializations/fizioterapiya — «Серкебаева, 81», без «Аксай»; /#/reviews — «Кардиодиагностика за один день», без check-up; /#/branches — только 2 филиала; page errors нет.
+
+Stage Summary:
+- Сид (prisma/seed-data.json) теперь содержит только актуальные данные: 2 реальных филиала, 47 направлений с реальным прайсом, 58 врачей, отзывы/FAQ/тексты/настройки. Демо-остатки удалены и из БД, и из репозитория (src/lib/alash/data/, scripts/seed.ts).
+- Команды переноса не изменились: npx prisma db push → npx prisma generate → npx prisma db seed; обновление сида — npm run db:export-seed.
