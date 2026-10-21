@@ -1,0 +1,68 @@
+🚀 Initializing Z-AI SDK...
+🔎 Searching images: "friendly doctor with stethoscope, full body cutout, transparent background PNG"
+✅ Got 8 images
+{
+  "success": true,
+  "query": "friendly doctor with stethoscope, full body cutout, transparent background PNG",
+  "count": 8,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/02b705ee8a12.png",
+      "caption": "",
+      "source": "PfizerForAll",
+      "original_width": "750px",
+      "original_height": "1056px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/1ea06bf2ae66.jpg",
+      "caption": "",
+      "source": "Etsy",
+      "original_width": "3000px",
+      "original_height": "3000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/6ba426af931e.png",
+      "caption": "",
+      "source": "Rawpixel",
+      "original_width": "800px",
+      "original_height": "1127px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/9823731c1a37.png",
+      "caption": "",
+      "source": "Creyos",
+      "original_width": "1556px",
+      "original_height": "1167px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ee402eecd349.jpg",
+      "caption": "",
+      "source": "Alamy",
+      "original_width": "1300px",
+      "original_height": "960px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/e4dd52beb0b3.jpg",
+      "caption": "",
+      "source": "Life Size Custom Cutouts",
+      "original_width": "1024px",
+      "original_height": "1024px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0f403e744fad.jpg",
+      "caption": "",
+      "source": "Dreamstime",
+      "original_width": "1600px",
+      "original_height": "1690px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/fdf878f008dd.jpg",
+      "caption": "",
+      "source": "Shutterstock",
+      "original_width": "1500px",
+      "original_height": "1600px"
+    }
+  ]
+}

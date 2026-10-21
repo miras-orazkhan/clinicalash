@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ КОНТЕНТ ============
+
+model Doctor {
+  id           String   @id // slug: "satybaldiyeva"
+  nameRu       String
+  nameKz       String
+  patronymicRu String   @default("")
+  patronymicKz String   @default("")
+  titleRu      String
+  titleKz      String
+  specialties  String   @default("[]") // JSON string[]: slugs
+  experience   Int      @default(0)
+  category     String   @default("highest") // highest | first | second
+  branches     String   @default("[]") // JSON string[]: branch ids
+  rating       Float    @default(4.9)
+  reviewsCount Int      @default(0)
+  price        Int      @default(0)
+  bioRu        String   @default("")
+  bioKz        String   @default("")
+  educationRu  String   @default("")
+  educationKz  String   @default("")
+  photoUrl     String?  // /uploads/... (не задано → инициалы)
+  published    Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Specialty {
+  slug       String  @id
+  kind       String  @default("specialty") // specialty | procedure
+  icon       String  @default("Stethoscope") // lucide icon name
+  nameRu     String
+  nameKz     String
+  shortRu    String  @default("")
+  shortKz    String  @default("")
+  descRu     String  @default("")
+  descKz     String  @default("")
+  featured   Boolean @default(false)
+  published  Boolean @default(true)
+  sortOrder  Int     @default(0)
+  services   String  @default("[]") // JSON: [{name:{ru,kz},price,note?:{ru,kz}}]
+  updatedAt  DateTime @updatedAt
+}
+
+model Branch {
+  id           String  @id // slug: "samal"
+  nameRu       String
+  nameKz       String
+  districtRu   String  @default("")
+  districtKz   String  @default("")
+  addressRu    String  @default("")
+  addressKz    String  @default("")
+  phone        String  @default("")
+  hours        String  @default("[]") // JSON Localized[]
+  descRu       String  @default("")
+  descKz       String  @default("")
+  highlights   String  @default("[]") // JSON Localized[]
+  landmarkRu   String  @default("")
+  landmarkKz   String  @default("")
+  mapUrl       String  @default("")
+  photoUrl     String?
+  published    Boolean @default(true)
+  sortOrder    Int     @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  author    String
+  date      String   // ISO yyyy-mm-dd
+  rating    Int      @default(5)
+  branchId  String?
+  doctorId  String?
+  text      String
+  source    String   @default("site") // site | imported
+  createdAt DateTime @default(now())
+}
+
+model FaqItem {
+  id        String  @id @default(cuid())
+  qRu       String
+  qKz       String  @default("")
+  aRu       String
+  aKz       String  @default("")
+  published Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+// ============ РЕДАКТИРУЕМЫЕ ТЕКСТЫ / ФОТО / НАСТРОЙКИ ============
+
+// Все тексты интерфейса: ключ → RU/KZ (мержатся поверх встроенного словаря)
+model SiteText {
+  key     String @id
+  valueRu String
+  valueKz String @default("")
+  updatedAt DateTime @updatedAt
+}
+
+// Фотографии сайта по ключам: hero.doctor, team.group и т.д.
+model SiteImage {
+  key     String @id
+  url     String
+  altRu   String @default("")
+  altKz   String @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  key     String @id
+  value   String
+  updatedAt DateTime @updatedAt
+}
+
+// Заявки записи с сайта
+model Booking {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  specSlug  String?
+  doctorId  String?
+  branchId  String?
+  date      String   @default("")
+  time      String   @default("")
+  status    String   @default("new") // new | confirmed | done | cancelled
+  createdAt DateTime @default(now())
+}
