@@ -374,3 +374,19 @@ Work Log:
 Stage Summary:
 - Сид (prisma/seed-data.json) теперь содержит только актуальные данные: 2 реальных филиала, 47 направлений с реальным прайсом, 58 врачей, отзывы/FAQ/тексты/настройки. Демо-остатки удалены и из БД, и из репозитория (src/lib/alash/data/, scripts/seed.ts).
 - Команды переноса не изменились: npx prisma db push → npx prisma generate → npx prisma db seed; обновление сида — npm run db:export-seed.
+
+---
+Task ID: 21
+Agent: main (Z.ai)
+Task: Деплой проекта в GitHub (https://github.com/miras-orazkhan/clinicalash.git)
+
+Work Log:
+- Состояние: платформа автокоммитила все изменения Tasks 19-20 (HEAD faa387b «Сайт медцентра „Алаш“…»), рабочее дерево чистое; remote не был настроен.
+- WAL/SHM убраны из git (db/*.db-wal, db/*.db-shm в .gitignore + git rm --cached) и перед коммитом сделан PRAGMA wal_checkpoint(TRUNCATE) — снапшот db/custom.db консистентен (688 КБ). Также в .gitignore добавлен /tool-results/.
+- Коммит faa387b (~29 МБ: код + public/ фото + db/custom.db + prisma/seed-data.json + worklog). Remote: origin → github.com/miras-orazkhan/clinicalash.git (токен в локальном .git/config, в коммит не попадает).
+- Push отклонён (remote имел GitHub-автогенерированный «Initial commit» c README.md); git pull --rebase --allow-unrelated-histories запутался в локальной истории платформы → rebase отменён, выполнен force push: 52f2e1c…faa387b main → main. Upstream настроен (origin/main).
+- Контрольная проверка: свежий clone репозитория — все ключевые файлы на месте (prisma/seed-data.json: branches 2 [pogranichnaya, serkebaeva], specialties 47, doctors 58, reviews 14, faq 6, siteTexts 233, settings 7), db/custom.db, package.json, src/ — OK. Clone-тест удалён.
+
+Stage Summary:
+- Проект задеплоен: github.com/miras-orazkhan/clinicalash (main = faa387b, ~29 МБ). На новой машине: git clone → bun install → npx prisma generate → npm run dev (БД уже в репо) либо prisma db push + prisma db seed для чистой БД.
+- Безопасность: админ-пароль (alash2026) присутствует в db/custom.db, prisma/seed-data.json и worklog.md — репозиторий держать приватным; PAT-токен лежит в локальном .git/config и засвечен в чате — по возможности ротировать.
