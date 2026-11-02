@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
+import { withPayload } from "@payloadcms/next/withPayload";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
 };
 
-export default nextConfig;
+// Payload вначале применяет свои serverExternalPackages и оптимизации
+export default withPayload(nextConfig);

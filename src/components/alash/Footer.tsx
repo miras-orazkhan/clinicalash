@@ -10,7 +10,7 @@ import { useContent, useClinic } from "./ContentProvider";
 export function Footer() {
   const { t, lang } = useI18n();
   const { branches, specialties } = useContent();
-  const { phoneMain, phoneMainHref, email, waLink, socials, license } = useClinic();
+  const { phoneMain, phoneMainHref, email, waLink, socials } = useClinic();
   const featuredSpecialties = specialties.filter((s) => s.featured);
 
   const nav = [
@@ -131,7 +131,6 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-teal-200/60 sm:flex-row sm:items-center sm:justify-between">
           <span>{t("footer.rights")}</span>
-          <span>{license}</span>
           <Link href="/privacy" className="underline-offset-2 transition hover:text-white hover:underline">
             {t("footer.policy")}
           </Link>

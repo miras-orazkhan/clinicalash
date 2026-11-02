@@ -4,7 +4,6 @@ export const CLINIC = {
   name: "Медцентр «Алаш»",
   nameKz: "«Алаш» медициналық орталығы",
   legal: "ТОО «Алаш Медикал»",
-  license: "Лицензия № KZ92VCU00012345 от 15.03.2024",
   since: 2012,
   phoneMain: "+7 (727) 350-40-40",
   phoneMainHref: "tel:+77273504040",

@@ -4,7 +4,7 @@
  * ПЕРЕНОС НА ДРУГУЮ МАШИНУ:
  *   1. Скопировать проект целиком (включая prisma/seed-data.json и public/ — там фото).
  *   2. bun install  (или npm install)
- *   3. В .env указать DATABASE_URL=file:<путь>/db/custom.db
+ *   3. В .env указать DATABASE_URL=postgresql://postgres:password@127.0.0.1:5434/clinicalash (PostgreSQL-контейнер clinicalash)
  *      (если БД-файла нет — создать: npx prisma db push)
  *   4. npx prisma generate
  *   5. npx prisma db seed        ← наполнит БД этими данными

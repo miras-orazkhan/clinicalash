@@ -390,3 +390,60 @@ Work Log:
 Stage Summary:
 - Проект задеплоен: github.com/miras-orazkhan/clinicalash (main = faa387b, ~29 МБ). На новой машине: git clone → bun install → npx prisma generate → npm run dev (БД уже в репо) либо prisma db push + prisma db seed для чистой БД.
 - Безопасность: админ-пароль (alash2026) присутствует в db/custom.db, prisma/seed-data.json и worklog.md — репозиторий держать приватным; PAT-токен лежит в локальном .git/config и засвечен в чате — по возможности ротировать.
+
+---
+Task ID: 22
+Agent: OpenCode
+Task: Переезд с SQLite на PostgreSQL (docker-контейнер clinicalash)
+
+Work Log:
+- Контейнер запущен: docker run --name clinicalash → postgres:16-alpine на 127.0.0.1:5434 (том clinicalash_pgdata, restart unless-stopped), POSTGRES_DB=clinicalash, user postgres/password.
+- prisma/schema.prisma: datasource provider sqlite → postgresql; JSON-колонки оставлены строками (String) — типизация кода и парсинг не менялись.
+- .env и .env.example: DATABASE_URL=postgresql://postgres:password@127.0.0.1:5434/clinicalash (пароль — только локальная разработка, порт слушает 127.0.0.1).
+- npx prisma generate → db push → db seed: все 8 таблиц наполнены из prisma/seed-data.json (doctors 58, specialties 47, branches 2, reviews 14, faq 6, siteTexts 233, siteImages 2, settings 7).
+- Верификация: dev-сервер — 9 публичных/админ-роутов 200; POST /api/bookings → теткет «АЛШ-993857», запись подтверждена в PostgreSQL (SELECT), тестовая заявка удалена.
+- README.md переписан под PostgreSQL: запуск контейнера, db push/seed, troubleshooting («database is locked» больше неактуален → проверки docker ps/порта 5434); комментарий в prisma/seed.mjs обновлён.
+- db/custom.db оставлен в репо как legacy-снапшот (откат возможен сменой provider на sqlite).
+
+Stage Summary:
+- БД проекта — PostgreSQL 16 в docker-контейнерe clinicalash (127.0.0.1:5434, том clinicalash_pgdata). Схема через prisma db push, контент через prisma db seed (идемпотентный сид перенесён на PostgreSQL без изменений).
+- На другой машине: docker run (команда в README) → npx prisma db push && npx prisma db seed → npm run dev.
+
+---
+Task ID: 23
+Agent: OpenCode
+Task: Headless CMS — Payload 3.91 параллельно со старой /admin (ɑ-этап: инфраструктура + миграция данных)
+
+Work Log:
+- Установлены payload@3.91.0, @payloadcms/next, @payloadcms/db-postgres, graphql, sharp. Lexical/@payloadcms/richtext-lexical удалены (контент сайта текстовый; конфликт версий lexical 0.35/0.50 устранён самим отказом от rich text; textarea-поля как в старом админ-UI).
+- Отдельная база Payload: POSTGRES clinicalash_cms в контейнере clinicalash (том же), env PAYLOAD_DATABASE_URL — намеренно НЕ общий с Prisma, чтобы drizzle-push Payload не переименовывал таблицы Prisma.
+- Коллекции (src/payload/collections/*): doctors, specialties (прайс-лист = localized array), branches (+ localized hours/highlights), reviews (один текст на два языка), faq (RU/KZ), bookings, site_texts, site_images (key + media или fallbackUrl), media (upload staticDir public/uploads), users (auth). Global: settings (phone_main/whatsapp/логалиц-лицензия, tabs). Локализация ru/kz (fallback true), admin: /cms, REST: /api/payload/*.
+- Migration seed-data.json → Payload через временный auth-гейт POST /api/payload-migrate (секрет = PAYLOAD_SECRET), двухшаговое заполнение локалей (create ru → update locale kz) — Payload не принимает object-map локалей в create. Медиа: фото врачей скопированы в public/uploads (плоско) и созданы как документы media (filePath).
+- Перенос: admin user admin@alash.kz / alash2026, филиалы 2, направления 47 (с услугами), врачи 58 (+фото), отзывы 14, faq 6, тексты 233 (по ключа+RU/KZ), photos сайта 2, настройки.
+- Проблемы, спокойно решённые в процессе: template из main-ветки GitHub оказался для v4 (generatePayloadViewport/WelcomeWidget не существуют в 3.91) → использованы правильные экспорты @payloadcms/next + пустой importMap; Next 16 не поддерживает два app-каталога (app/ перехватил роуты у src/app → файлы перенесены в src/app/(payload)); drizzle push на общей БД планировал rename Prisma-таблиц → выделена отдельная БД; media.staticDir через process.cwd() (в рантайме Next __dirname невалиден).
+- Верификация: / и все 8 публичных роутов → 200, старая /admin → 200, /cms → 200 с логином; Payload REST /api/payload/site_texts → 233 ключа, /api/payload/doctors?locale=kz → KZ-имена/спешалы/био; медицинский файл выдаётся через /api/payload/media/file/*; doctor photo/media url → HTTP 200; telemetry-выход миграции: идемпотентен (второй прогон создал 0 новых docs).
+- tsc чисто (без examples/*), ESLint по payload-файлам 0/0.
+
+Stage Summary:
+- Payload 3.91 поднята параллельно (админка на /cms, REST /api/payload), данные клиники полностью перенесены и локализованы RU/KZ; старая /admin продолжает работать на прежней схеме БД.
+- Схема коллекций зеркалит старую модель (slug, локализованные поля, прайсы, branches/specialties relationships) — следующий этап: переключить сайт на чтение Payload (content.ts) и перенести /api/bookings, /api/reviews; затем удалить старую /admin и старые таблицы Prisma.
+- Доступ к Payload-админ: /cms, admin@alash.kz / alash2026.
+
+---
+Task ID: 24
+Agent: OpenCode
+Task: Переключение сайта на Payload (content.ts, заявки, отзывы) + удаление старой /admin
+
+Work Log:
+- Приложение разделено на route group: src/app/(site) — весь сайт, src/app/(payload) — Payload. Устранён hydration-баг: корневой layout сайта оборачивал детей в <main id="main">, и <html> админки рендерился внутри <main>; теперь у каждого свою группу корневой layout.
+- src/lib/alash/payloadClient.ts — единый getPayload({config}) для серверного кода.
+- content.ts переписан на Payload Local API (locale '*'): mmap всех полей сохранён точно (Doctor/Specialty/ServiceItem/Branch/Review/FaqItem + images/settings в тех же ключах), сортировка sortOrder asc + name ru localeCompare; фото ветcher → media.url (depth 1).
+- /api/bookings и /api/reviews переписаны на Payload: doctors/branches dайвер resolution по slug → id; заявка создаётся с генерацией тикета «АЛШ-XXX-…» (новое поле ticket in bookings, readOnly), отзыв — напрямую в коллекцию reviews (source=site).
+- УДЕЛЕНО: src/app/(site)/admin/* (11 страниц старой админки), src/app/(site)/api/admin/* (16 роутов), src/components/alash/admin/* (10 компонентов), src/lib/alash/{admin-auth,admin-rows,csv}.ts, src/lib/db.ts (Prisma client кнопка), плавающая кнопка-ссылка на /admin в SiteFrame.
+- payload-migrate (?export=1): экспорт Payload-контента в формат seed-снапшота (prisma/seed-data.json) — 58/47/2/14/6/233/2/6 ключей/настроек; (?rebuildMedia=1) осталась для disaster-restore.
+- Верификация: все 11 публичных роутов → 200 (контент уже читается из Payload: имена/фото/прайсы/филиалы соответствуют); /admin → 404; /cms → 200; POST заявки → тикет АЛШ-988293 строкой в bookings payload-БД (тест очищен); POST отзыва → документ в reviews (source=site, тест очищен); tsc чисто; ESLint: остались 2 пре-существующие ошибки из шаблона (ui/carousel.tsx, hooks/use-mobile.ts — react-hooks/set-state-in-effect, не сайт и не админ).
+- Prisma оставлена в зависимостях (клиент+скрипты 21 задачи) и таблицы clinicalash не тронуты — откат возможен git revert; полное выпиливание Prisma — в Phase C по согласованию.
+
+Stage Summary:
+- Единственная админка — Payload /cms (login admin@alash.kz/alash2026). Сайт читает контент напрямую из Payload Local API; заявки и отзывы пишутся в Payload.
+- Что перенесено с Phase B не полностью: CSV-импорт/экспорт (функция удалена со старой админкой — восстановить можно отдельным роутом по запросу); параллельно старая auth-cookie модель больше не используется.

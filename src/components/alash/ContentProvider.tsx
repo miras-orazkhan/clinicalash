@@ -25,7 +25,6 @@ export function useClinic() {
   const whatsapp = settings.whatsapp || "77013504040";
   const email = settings.email || CLINIC.email;
   const legal = settings.clinic_legal || CLINIC.legal;
-  const license = settings.clinic_license || CLINIC.license;
   const telHref = (p: string) => `tel:${p.replace(/[^+\d]/g, "")}`;
   const waLink = (text?: string) => {
     const base = `https://wa.me/${whatsapp.replace(/\D/g, "")}`;
@@ -41,7 +40,6 @@ export function useClinic() {
     waLink,
     email,
     legal,
-    license,
     socials: CLINIC.socials,
   };
 }

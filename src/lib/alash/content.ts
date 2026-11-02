@@ -1,17 +1,8 @@
-import { db } from "@/lib/db";
+import { getPayloadClient } from "./payloadClient";
 import type { Branch, DocCategory, Doctor, FaqItem, Review, ServiceItem, Specialty, SpecialtyKind } from "./types";
 import type { Dicts } from "./i18n";
 
-function parseJSON<T>(s: string | null | undefined, fallback: T): T {
-  if (!s) return fallback;
-  try {
-    return JSON.parse(s) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-/** Контент сайта, прочитанный из БД — в форматах существующих TS-интерфейсов */
+/** Контент сайта, читаемый из Payload — в форматах существующих TS-интерфейсов */
 export interface SiteContent {
   doctors: Doctor[];
   specialties: Specialty[]; // процедуры + врачебные направления, единый отсортированный список
@@ -22,91 +13,178 @@ export interface SiteContent {
   settings: Record<string, string>;
 }
 
+type Row = Record<string, unknown> | null | undefined;
+
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+const loc = (v: unknown): { ru: string; kz: string } => {
+  const o = (v ?? null) as Row;
+  return { ru: str(o?.ru), kz: str(o?.kz) };
+};
+const num = (v: unknown, fallback = 0): number =>
+  (typeof v === "number" ? v : Number(v) || fallback) as number;
+
+const bySortOrder = (a: Row, b: Row): number => {
+  const da = a ?? {}, dbb = b ?? {};
+  const so = num(da.sortOrder) - num(dbb.sortOrder);
+  if (so !== 0) return so;
+  return str((da.name as Row)?.ru).localeCompare(str((dbb.name as Row)?.ru), "ru");
+};
+
 export async function getSiteContent(): Promise<SiteContent> {
-  const [docRows, specRows, branchRows, reviewRows, faqRows, imageRows, settingRows] = await Promise.all([
-    db.doctor.findMany({ where: { published: true }, orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }] }),
-    db.specialty.findMany({ where: { published: true }, orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }] }),
-    db.branch.findMany({ where: { published: true }, orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }] }),
-    db.review.findMany({ orderBy: [{ date: "desc" }, { createdAt: "desc" }] }),
-    db.faqItem.findMany({ where: { published: true }, orderBy: [{ sortOrder: "asc" }] }),
-    db.siteImage.findMany(),
-    db.setting.findMany(),
-  ]);
+  const payload = await getPayloadClient();
 
-  const doctors: Doctor[] = docRows.map((d) => ({
-    id: d.id,
-    name: { ru: d.nameRu, kz: d.nameKz },
-    patronymic: { ru: d.patronymicRu, kz: d.patronymicKz },
-    title: { ru: d.titleRu, kz: d.titleKz },
-    specialties: parseJSON<string[]>(d.specialties, []),
-    experience: d.experience,
-    category: d.category as DocCategory,
-    branches: parseJSON<string[]>(d.branches, []),
-    rating: d.rating,
-    reviewsCount: d.reviewsCount,
-    price: d.price,
-    bio: { ru: d.bioRu, kz: d.bioKz },
-    education: { ru: d.educationRu, kz: d.educationKz },
-    photoUrl: d.photoUrl ?? undefined,
-  }));
+  const [docRows, specRows, branchRows, reviewRows, faqRows, imageRows, settings] =
+    await Promise.all([
+      payload.find({ collection: "doctors", where: { published: { equals: true } }, depth: 1, locale: "*", limit: 0, overrideAccess: true }),
+      payload.find({ collection: "specialties", where: { published: { equals: true } }, depth: 0, locale: "*", limit: 0, overrideAccess: true }),
+      payload.find({ collection: "branches", where: { published: { equals: true } }, depth: 1, locale: "*", limit: 0, overrideAccess: true }),
+      payload.find({ collection: "reviews", depth: 1, limit: 0, sort: "-date", overrideAccess: true }),
+      payload.find({ collection: "faq", where: { published: { equals: true } }, depth: 0, locale: "*", limit: 0, overrideAccess: true }),
+      payload.find({ collection: "site_images", depth: 1, locale: "*", limit: 0, overrideAccess: true }),
+      payload.findGlobal({ slug: "settings", depth: 0, locale: "*", overrideAccess: true }),
+    ]);
 
-  const specialties: Specialty[] = specRows.map((s) => ({
-    slug: s.slug,
-    kind: s.kind as SpecialtyKind,
-    icon: s.icon,
-    name: { ru: s.nameRu, kz: s.nameKz },
-    short: { ru: s.shortRu, kz: s.shortKz },
-    desc: { ru: s.descRu, kz: s.descKz },
-    services: parseJSON<ServiceItem[]>(s.services, []),
-    featured: s.featured,
-  }));
+  const doctors: Doctor[] = (docRows.docs as Row[]).sort(bySortOrder).map((d) => {
+    const r = d ?? {};
+    return {
+      id: str(r.slug),
+      name: loc(r.name),
+      patronymic: loc(r.patronymic),
+      title: loc(r.title),
+      specialties: ((r.specialties as Row[]) ?? []).map((x) => str(x?.slug)),
+      experience: num(r.experience),
+      category: (str(r.category) || "highest") as DocCategory,
+      branches: ((r.branches as Row[]) ?? []).map((x) => str(x?.slug)),
+      rating: num(r.rating, 4.9),
+      reviewsCount: num(r.reviewsCount),
+      price: num(r.price),
+      bio: loc(r.bio),
+      education: loc(r.education),
+      photoUrl:
+        (r.photo as Row)?.url ? str((r.photo as Row)?.url) : undefined,
+    };
+  });
 
-  const branches: Branch[] = branchRows.map((b) => ({
-    id: b.id,
-    name: { ru: b.nameRu, kz: b.nameKz },
-    district: { ru: b.districtRu, kz: b.districtKz },
-    address: { ru: b.addressRu, kz: b.addressKz },
-    phone: b.phone,
-    hours: parseJSON<Branch["hours"]>(b.hours, []),
-    desc: { ru: b.descRu, kz: b.descKz },
-    highlights: parseJSON<Branch["highlights"]>(b.highlights, []),
-    landmark: { ru: b.landmarkRu, kz: b.landmarkKz },
-    mapUrl: b.mapUrl,
-  }));
+  const specialties: Specialty[] = (specRows.docs as Row[]).sort(bySortOrder).map((s) => {
+    const r = s ?? {};
+    const servicesMap = (r.services ?? {}) as { ru?: unknown; kz?: unknown };
+    const ruSvc = ((servicesMap.ru as Row[]) ?? []);
+    const kzSvc = ((servicesMap.kz as Row[]) ?? []);
+    return {
+      slug: str(r.slug),
+      kind: (str(r.kind) || "specialty") as SpecialtyKind,
+      icon: str(r.icon) || "Stethoscope",
+      name: loc(r.name),
+      short: loc(r.short),
+      desc: loc(r.desc),
+      services: ruSvc.map((x, i) => {
+        const y = kzSvc[i] ?? {};
+        const noteRu = str(x?.note);
+        const noteKz = str(y?.note);
+        return {
+          name: { ru: str(x?.name), kz: str(y?.name) || str(x?.name) },
+          price: num(x?.price),
+          note: noteRu || noteKz ? { ru: noteRu, kz: noteKz } : undefined,
+        };
+      }),
+      featured: Boolean(r.featured),
+    };
+  });
 
-  const reviews: Review[] = reviewRows.map((r) => ({
-    id: r.id,
-    author: r.author,
-    date: r.date,
-    rating: r.rating,
-    branchId: r.branchId ?? undefined,
-    doctorId: r.doctorId ?? undefined,
-    text: r.text,
-    local: r.source === "site",
-  }));
+  const branches: Branch[] = (branchRows.docs as Row[]).sort(bySortOrder).map((b) => {
+    const r = b ?? {};
+    const hoursMap = (r.hours ?? {}) as { ru?: unknown; kz?: unknown };
+    const toLines = (list: unknown): { ru: string; kz: string }[] =>
+      ((list as Row[]) ?? []).map((x) => ({ ru: str(x?.line), kz: str(x?.line) }));
+    const ruHours = toLines(hoursMap.ru);
+    const kzHours = toLines(hoursMap.kz);
+    const hiMap = (r.highlights ?? {}) as { ru?: unknown; kz?: unknown };
+    const chop = (list: unknown): string[] =>
+      ((list as unknown[]) ?? []).map((x) => (typeof x === "string" ? x : "")).filter(Boolean);
+    const ruHi = chop(hiMap.ru);
+    const kzHi = chop(hiMap.kz);
+    return {
+      id: str(r.slug),
+      name: loc(r.name),
+      district: loc(r.district),
+      address: loc(r.address),
+      phone: str(r.phone),
+      hours: ruHours.map((h, i) => ({ ru: h.ru, kz: kzHours[i]?.kz ?? h.kz })),
+      desc: loc(r.desc),
+      highlights: ruHi.map((h, i) => ({ ru: h, kz: kzHi[i] ?? h })),
+      landmark: loc(r.landmark),
+      mapUrl: str(r.mapUrl),
+    };
+  });
 
-  const faq: FaqItem[] = faqRows.map((f) => ({
-    q: { ru: f.qRu, kz: f.qKz },
-    a: { ru: f.aRu, kz: f.aKz },
-  }));
+  const reviews: Review[] = (reviewRows.docs as Row[]).map((v) => {
+    const r = v ?? {};
+    return {
+      id: String(r.id ?? ""),
+      author: str(r.author),
+      date: str(r.date),
+      rating: num(r.rating, 5),
+      branchId: (r.branch as Row)?.slug ? str((r.branch as Row)?.slug) : undefined,
+      doctorId: (r.doctor as Row)?.slug ? str((r.doctor as Row)?.slug) : undefined,
+      text: str(r.text),
+      local: str(r.source) === "site",
+    };
+  });
+
+  const faq: FaqItem[] = (faqRows.docs as Row[]).sort(bySortOrder).map((f) => {
+    const r = f ?? {};
+    return { q: loc(r.q), a: loc(r.a) };
+  });
 
   const images: SiteContent["images"] = {};
-  for (const img of imageRows) images[img.key] = { url: img.url, altRu: img.altRu, altKz: img.altKz };
+  for (const img of imageRows.docs as Row[]) {
+    const r = img ?? {};
+    const key = str(r.key) as string;
+    const alt = loc(r.alt);
+    images[key] = {
+      url: (r.image as Row)?.url ? str((r.image as Row)?.url) : str(r.fallbackUrl),
+      altRu: alt.ru,
+      altKz: alt.kz,
+    };
+  }
 
-  const settings: Record<string, string> = {};
-  for (const s of settingRows) settings[s.key] = s.value;
-
-  return { doctors, specialties, branches, reviews, faq, images, settings };
+  const st = settings as Row;
+  return {
+    doctors,
+    specialties,
+    branches,
+    reviews,
+    faq,
+    images,
+    settings: {
+      phone_main: str(st?.phone_main),
+      phone_mobile: str(st?.phone_mobile),
+      whatsapp: str(st?.whatsapp),
+      email: str(st?.email ?? ""),
+      clinic_legal: str(st?.clinic_legal ?? ""),
+    },
+  };
 }
 
-/** Редактируемые тексты из БД: { ru: {key:value}, kz: {...} } */
+/** Редактируемые тексты из Payload: { ru: {key:value}, kz: {...} } */
 export async function getDbTexts(): Promise<Dicts> {
-  const rows = await db.siteText.findMany();
+  const payload = await getPayloadClient();
+  const res = await payload.find({
+    collection: "site_texts",
+    depth: 0,
+    locale: "*",
+    limit: 0,
+    overrideAccess: true,
+  });
   const ru: Record<string, string> = {};
   const kz: Record<string, string> = {};
-  for (const r of rows) {
-    ru[r.key] = r.valueRu;
-    if (r.valueKz) kz[r.key] = r.valueKz;
+  for (const doc of res.docs as Row[]) {
+    const r = doc ?? {};
+    const key = str(r.key);
+    if (!key) continue;
+    const value = loc(r.value);
+    ru[key] = value.ru;
+    if (value.kz) kz[key] = value.kz;
   }
   return { ru, kz };
 }
